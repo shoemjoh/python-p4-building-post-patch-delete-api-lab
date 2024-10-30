@@ -18,17 +18,69 @@ db.init_app(app)
 def home():
     return '<h1>Bakery GET-POST-PATCH-DELETE API</h1>'
 
+
+@app.route('/baked_goods', methods=['POST'])
+def baked_goods():
+    # Retrieve form data directly from request.form
+    name = request.form.get("name")
+    price = request.form.get("price")
+    
+    # Check for required fields (optional)
+    if not name or not price:
+        return make_response({"error": "Missing required fields"}, 400)
+    
+    # Create a new BakedGood instance
+    new_baked_good = BakedGood(
+        name=name,
+        price=price
+    )
+    
+    # Add to the session and commit to the database
+    db.session.add(new_baked_good)
+    db.session.commit()
+    
+    # Serialize the new baked good and return a 201 response
+    baked_good_dict = new_baked_good.to_dict()
+    
+    return make_response(baked_good_dict, 201)  # Status code 201 for creation
+
+@app.route('/baked_goods/<int:id>', methods=['DELETE'])
+def baked_goods_by_id(id):
+    baked_good = BakedGood.query.filter_by(id=id).first()
+    db.session.delete(baked_good)
+    db.session.commit()
+    response_body = {
+            "delete_successful": True,
+            "message": "Review deleted."
+        }
+
+    response = make_response(
+            response_body,
+            200
+        )
+
+    return response
+
 @app.route('/bakeries')
 def bakeries():
     bakeries = [bakery.to_dict() for bakery in Bakery.query.all()]
     return make_response(  bakeries,   200  )
 
-@app.route('/bakeries/<int:id>')
+@app.route('/bakeries/<int:id>', methods=['GET', 'PATCH'])
 def bakery_by_id(id):
 
     bakery = Bakery.query.filter_by(id=id).first()
-    bakery_serialized = bakery.to_dict()
-    return make_response ( bakery_serialized, 200  )
+    if request.method == 'GET':
+        bakery_serialized = bakery.to_dict()
+        return make_response ( bakery_serialized, 200  )
+    elif request.method == 'PATCH':
+        for attr in request.form:
+            setattr(bakery, attr, request.form.get(attr))
+        db.session.add(bakery)
+        db.session.commit()
+
+        bakery_dict = bakery.to_dict()
+        return make_response(bakery_dict, 200)
 
 @app.route('/baked_goods/by_price')
 def baked_goods_by_price():
